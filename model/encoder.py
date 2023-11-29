@@ -99,12 +99,10 @@ def get_mask(batch_size,sequence_length):
     return result
 
 def test_postion_wise_feed_forward(encoder_class,x,layer_index):
-    sub_layer_postion_wise_feed_forward_output=encoder_class.sub_layer_postion_wise_feed_forward(x, layer_index)
-    return sub_layer_postion_wise_feed_forward_output
+    return encoder_class.sub_layer_postion_wise_feed_forward(x, layer_index)
 
 def test_sub_layer_multi_head_attention(encoder_class,index_layer,Q,K_s,V_s):
-    sub_layer_multi_head_attention_output=encoder_class.sub_layer_multi_head_attention(index_layer,Q,K_s,V_s)
-    return sub_layer_multi_head_attention_output
+    return encoder_class.sub_layer_multi_head_attention(index_layer,Q,K_s,V_s)
 
 
 encoder_class,Q,K_s,V_s=init()

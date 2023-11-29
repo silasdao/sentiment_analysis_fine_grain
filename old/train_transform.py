@@ -52,7 +52,10 @@ tf.app.flags.DEFINE_boolean("is_fine_tuning",False,"is_finetuning.ture:this is f
 
 def main(_):
     vocab_word2index, label2index= create_or_load_vocabulary(FLAGS.data_path,FLAGS.training_data_file,FLAGS.vocab_size,test_mode=FLAGS.test_mode,tokenize_style=FLAGS.tokenize_style,model_name='transfomer')
-    vocab_size = len(vocab_word2index);print("cnn_model.vocab_size:",vocab_size);num_classes=len(label2index);print("num_classes:",num_classes)
+    vocab_size = len(vocab_word2index)
+    print("cnn_model.vocab_size:",vocab_size)
+    num_classes=len(label2index)
+    print("num_classes:",num_classes)
     train,valid, test= load_data_multilabel(FLAGS.data_path,FLAGS.training_data_file,FLAGS.valid_data_file,FLAGS.test_data_file,vocab_word2index,label2index,FLAGS.sequence_length,
                                             process_num=FLAGS.process_num,test_mode=FLAGS.test_mode,tokenize_style=FLAGS.tokenize_style,model_name='transfomer')
     train_X, train_Y= train
@@ -68,7 +71,7 @@ def main(_):
         model=TransformerModel(config)
         #Initialize Save
         saver=tf.train.Saver()
-        if os.path.exists(FLAGS.ckpt_dir+"checkpoint"):
+        if os.path.exists(f"{FLAGS.ckpt_dir}checkpoint"):
             print("Restoring Variables from Checkpoint.")
             saver.restore(sess,tf.train.latest_checkpoint(FLAGS.ckpt_dir))
             #for i in range(2): #decay learning rate if necessary.
@@ -105,7 +108,7 @@ def main(_):
 
                     # save model to checkpoint
                     if f1_score_valid>score_best:
-                        save_path = FLAGS.ckpt_dir + "model.ckpt"
+                        save_path = f"{FLAGS.ckpt_dir}model.ckpt"
                         print("going to save check point.")
                         saver.save(sess, save_path, global_step=epoch)
                         score_best=f1_score_valid
@@ -121,11 +124,11 @@ def main(_):
                 print("Valid.Epoch %d ValidLoss:%.3f\tF1 score:%.3f\tMacro_f1:%.3f\tMicro_f1:%.3f\t"% (epoch,loss_valid,f1_score_valid2,f1_macro_valid2,f1_micro_valid2))
                 #save model to checkpoint
                 if f1_score_valid2 > score_best:
-                    save_path=FLAGS.ckpt_dir+"model.ckpt"
+                    save_path = f"{FLAGS.ckpt_dir}model.ckpt"
                     print("going to save check point.")
                     saver.save(sess,save_path,global_step=epoch)
                     score_best = f1_score_valid2
-            if (epoch == 2 or epoch == 4 or epoch == 6 or epoch == 9 or epoch == 13):
+            if epoch in [2, 4, 6, 9, 13]:
                 for i in range(1):
                     print(i, "Going to decay learning rate by half.")
                     sess.run(model.learning_rate_decay_half_op)

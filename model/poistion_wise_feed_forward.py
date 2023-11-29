@@ -51,8 +51,7 @@ class PositionWiseFeedFoward(object):
             output_conv1,filters=self.d_model,kernel_size=[1,self.d_ff],padding="VALID",
             name='conv2',kernel_initializer=self.initializer,activation=None
         )
-        output=tf.squeeze(output_conv2) #[batch,sequence_length,d_model]
-        return output #[batch,sequence_length,d_model]
+        return tf.squeeze(output_conv2)
 
     def position_wise_feed_forward_fc_fn(self):
         """
@@ -70,7 +69,7 @@ class PositionWiseFeedFoward(object):
         element_list = [tf.squeeze(element, axis=1) for element in element_list]  # it is a list,length is sequence_length, each element is [batch_size,d_model]
         output_list=[]
         for i, element in enumerate(element_list):
-            with tf.variable_scope("foo", reuse=True if i>0 else False):
+            with tf.variable_scope("foo", reuse=i > 0):
                 # 1. layer 1
                 W1 = tf.get_variable("ff_layer1", shape=[self.d_model, self.d_ff], initializer=self.initializer)
                 z1=tf.nn.relu(tf.matmul(element,W1)) # z1:[batch_size,d_ff]<--------tf.matmul([batch_size,d_model],[d_model, d_ff])
@@ -78,8 +77,7 @@ class PositionWiseFeedFoward(object):
                 W2 = tf.get_variable("ff_layer2", shape=[self.d_ff, self.d_model], initializer=self.initializer)
                 output_element=tf.matmul(z1,W2) # output:[batch_size,d_model]<----------tf.matmul([batch_size,d_ff],[d_ff, d_model])
                 output_list.append(output_element) # a list, each element is [batch_size,d_model]
-        output=tf.stack(output_list,axis=1) # [batch,sequence_length,d_model]
-        return output # [batch,sequence_length,d_model]
+        return tf.stack(output_list,axis=1)
 
 #test function of position_wise_feed_forward_fn
 #time spent:OLD VERSION(FC): length=1000,time spent:2.04 s; NEW VERSION(CNN):0.03s, speed up as 68x.

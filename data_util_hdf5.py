@@ -58,9 +58,9 @@ def load_data_multilabel(data_path,traning_data_path,valid_data_path,test_data_p
     print("###vocab_word2index:",len(vocab_word2index),";label2index:",len(label2index),";sentence_len:",sentence_len)
     # 1. use cache file if exist
     if model_name is not None:
-        cache_file =data_path+"/"+model_name+'train_valid_test.h5'
+        cache_file = f"{data_path}/{model_name}train_valid_test.h5"
     else:
-        cache_file =data_path+"/"+'train_valid_test.h5'
+        cache_file = f"{data_path}/train_valid_test.h5"
 
     cache_file_exist_flag=os.path.exists(cache_file)
     print("cache_path:",cache_file,"train_valid_test_file_exists:",cache_file_exist_flag,";traning_data_path:",traning_data_path,";valid_data_path:",valid_data_path)
@@ -76,9 +76,9 @@ def load_data_multilabel(data_path,traning_data_path,valid_data_path,test_data_p
     valid_lines = read_file(valid_data_path)
     test_lines = read_file(test_data_path)
     if test_mode:
-        train_lines = train_lines[0:10000]
-        valid_lines = valid_lines[0:1000]
-        test_lines = test_lines[0:1000]
+        train_lines = train_lines[:10000]
+        valid_lines = valid_lines[:1000]
+        test_lines = test_lines[:1000]
 
     number_examples=len(train_lines)
     print("load_data_multilabel.length of train_lines:",number_examples,";valid_lines:",len(valid_lines),";test_lines:",len(test_lines))
@@ -90,7 +90,7 @@ def load_data_multilabel(data_path,traning_data_path,valid_data_path,test_data_p
     pool = multiprocessing.Pool(processes=process_num)
     # 3.2 use multiprocessing to handle different chunk. each chunk will be transformed and save to file system.
     for chunk_id, each_chunk in enumerate(chunks):
-        file_name= data_path+"training_data_temp_" + str(chunk_id) # ".npy" #data_path +
+        file_name = f"{data_path}training_data_temp_{str(chunk_id)}"
         print("#start multi-processing:",chunk_id,file_name)
         # 3.3 apply_async
         print("chunk:",len(each_chunk),";file_name:",file_name,";")
@@ -103,13 +103,13 @@ def load_data_multilabel(data_path,traning_data_path,valid_data_path,test_data_p
     # 3.4 merge sub file to final file.
     X, Y=[],[]
     for chunk_id in range(process_num):
-        file_name_X =data_path+"training_data_temp_" + str(chunk_id)+'X.npy'
-        file_name_Y =data_path+"training_data_temp_" + str(chunk_id)+'Y.npy'
+        file_name_X = f"{data_path}training_data_temp_{str(chunk_id)}X.npy"
+        file_name_Y = f"{data_path}training_data_temp_{str(chunk_id)}Y.npy"
         x_sub=np.load(file_name_X)
         y_sub=np.load(file_name_Y)
         X.extend(x_sub)
         Y.extend(y_sub)
-        command = 'rm ' + file_name_X+" "+file_name_Y
+        command = f'rm {file_name_X} {file_name_Y}'
         os.system(command)
     ############## above is for multi-processing ##########################################################################################################
 
@@ -184,9 +184,8 @@ def transform_data_to_index(lines,target_file_path,vocab_word2index,label2index,
     if data_type=='train':
         #with open(target_file_path, 'ab') as target_file:
         print(data_type,"transform_data_to_index.dump file.target_file_path:",target_file_path)
-            #pickle.dump(data, target_file,protocol=pickle.HIGHEST_PROTOCOL)
-        np.save(target_file_path+'X.npy', X) # np.save(outfile, x)
-        np.save(target_file_path+'Y.npy', Y) # np.save(outfile, x)
+        np.save(f'{target_file_path}X.npy', X)
+        np.save(f'{target_file_path}Y.npy', Y)
 
     else:
         print("###:data_type:",data_type,";going to return data.")
@@ -206,8 +205,7 @@ def transform_multilabel_as_multihot(label_list,label_size):
 
 def transform_mulitihot_as_dense_list(multihot_list):
     length=len(multihot_list)
-    result_list=[i for i in range(length) if multihot_list[i] > 0]
-    return result_list
+    return [i for i in range(length) if multihot_list[i] > 0]
 
 def create_or_load_vocabulary(data_path,training_data_path,vocab_size,test_mode=False,tokenize_style='word',fine_tuning_stage=False,model_name=None):
     """
@@ -229,7 +227,7 @@ def create_or_load_vocabulary(data_path,training_data_path,vocab_size,test_mode=
     if model_name is not None:
         cache_path =data_path+model_name+'vocab_label.pik'
     else:
-        cache_path =data_path+'vocab_label.pik'
+        cache_path = f'{data_path}vocab_label.pik'
     print("cache_path:",cache_path,"file_exists:",os.path.exists(cache_path))
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as data_f:
@@ -242,11 +240,7 @@ def create_or_load_vocabulary(data_path,training_data_path,vocab_size,test_mode=
     file_object.close()
 
     random.shuffle(lines)
-    if test_mode:
-       lines=lines[0:20000]
-    else:
-        lines = lines[0:200*1000] # to make create vocabulary process more quicker, we only random select 200k lines.
-
+    lines = lines[:20000] if test_mode else lines[:200*1000]
     # 3.loop each line,put to counter
     c_inputs=Counter()
     c_labels=Counter()
@@ -261,11 +255,7 @@ def create_or_load_vocabulary(data_path,training_data_path,vocab_size,test_mode=
     # 4.get most frequency words and all labels
     if tokenize_style=='char':vocab_size=6000 # if we are using character instead of word, then use small vocabulary size.
     vocab_list=c_inputs.most_common(vocab_size)
-    vocab_word2index={}
-    vocab_word2index[_PAD]=PAD_ID
-    vocab_word2index[_UNK]=UNK_ID
-    vocab_word2index[_CLS]=CLS_ID
-    vocab_word2index[_MASK]=MASK_ID
+    vocab_word2index = {_PAD: PAD_ID, _UNK: UNK_ID, _CLS: CLS_ID, _MASK: MASK_ID}
     for i,tuplee in enumerate(vocab_list):
         word,freq=tuplee
         vocab_word2index[word]=i+4
@@ -294,7 +284,7 @@ def get_lable2index(data_path,training_data_path,tokenize_style='word'):
     :param tokenize_style:
     :return:
     """
-    cache_file =data_path+"/"+'fine_tuning_label.pik'
+    cache_file = f"{data_path}/fine_tuning_label.pik"
     if os.path.exists(cache_file):
         with open(cache_file, 'rb') as data_f:
             print("going to load cache file of label for fine-tuning.")
@@ -302,7 +292,7 @@ def get_lable2index(data_path,training_data_path,tokenize_style='word'):
     file_object = codecs.open(training_data_path, mode='r', encoding='utf-8')
     lines=file_object.readlines()
     random.shuffle(lines)
-    lines=lines[0:60000] # only read 100k lines to make training fast
+    lines = lines[:60000]
     c_labels=Counter()
     for i,line in enumerate(lines):
         _,input_label=get_input_strings_and_labels(line, tokenize_style=tokenize_style)
@@ -337,8 +327,8 @@ def get_input_strings_and_labels(line,tokenize_style='word'):
 
 def token_string_as_list(string,tokenize_style='word'):
     if random.randint(0, 500) == 1:print("token_string_as_list.string:",string,"tokenize_style:",tokenize_style)
-    length=len(string)
     if tokenize_style=='char':
+        length=len(string)
         listt=[string[i] for i in range(length)]
     elif tokenize_style=='word':
         listt=jieba.lcut(string)
@@ -348,7 +338,7 @@ def token_string_as_list(string,tokenize_style='word'):
 def get_part_validation_data(valid,num_valid=6000*20):#6000
     valid_X, valid_X_feature, valid_Y_accusation, valid_Y_article, valid_Y_deathpenalty, valid_Y_lifeimprisonment, valid_Y_imprisonment,weight_accusations,weight_artilces=valid
     number_examples=len(valid_X)
-    permutation = np.random.permutation(number_examples)[0:num_valid]
+    permutation = np.random.permutation(number_examples)[:num_valid]
     valid_X2, valid_X2_feature,valid_Y_accusation2, valid_Y_article2, valid_Y_deathpenalty2, valid_Y_lifeimprisonment2, valid_Y_imprisonment2,weight_accusations2,weight_artilces=[],[],[],[],[],[],[],[],[]
     for index in permutation :
         valid_X2.append(valid_X[index])
@@ -413,10 +403,10 @@ def pad_truncate_list(x_list, maxlen):
     :param x_list:e.g. [1,10,3,5,...]
     :return:result_list:a new list,length is maxlen
     """
-    result_list=[0 for i in range(maxlen)]
+    result_list = [0 for _ in range(maxlen)]
     length_input=len(x_list)
     if length_input>maxlen:
-        x_list = x_list[0:maxlen]
+        x_list = x_list[:maxlen]
     for i, element in enumerate(x_list):
         result_list[i] = element
     return result_list
@@ -482,10 +472,10 @@ def load_word2vec(word2vec_model_path,embed_size):
     word2vec_dict = {}
     with open(word2vec_model_path, errors='ignore') as f:
         meta = f.readline()
-        for line in f.readlines():
+        for line in f:
             items = line.split(' ')
             #if len(items[0]) > 1 and items[0] in vocab:
-            word2vec_dict[items[0]] = np.fromiter(items[1:][0:embed_size], dtype=float)
+            word2vec_dict[items[0]] = np.fromiter(items[1:][:embed_size], dtype=float)
     return word2vec_dict
 
 def set_config(FLAGS,num_classes,vocab_size):
@@ -518,8 +508,8 @@ def set_config(FLAGS,num_classes,vocab_size):
 
 # below is for testing create_or_load_vocabulary,load_data_multilabel/
 data_path='./data/'
-traning_data_path=data_path+'xxx_20181022_train.txt'
-valid_data_path=data_path+'xxx_20181022_test.txt'
+traning_data_path = f'{data_path}xxx_20181022_train.txt'
+valid_data_path = f'{data_path}xxx_20181022_test.txt'
 test_data_path=valid_data_path
 vocab_size=50000
 process_num=5

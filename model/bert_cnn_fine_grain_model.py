@@ -143,17 +143,7 @@ class BertCNNFineGrainModel:
         #                      self.input_representation,dropout_keep_prob=self.dropout_keep_prob,use_residual_conn=self.use_residual_conn)
         #h= encoder_class.encoder_fn() # [batch_size,sequence_length,d_model]
         h = self.conv_layers_return_2layers(self.input_representation, 'conv_layer',reuse_flag=False)  # [batch_size,num_total_filters]
-        # 3. get hidden state of token of [cls], and project it to make a predict.
-        #h_cls=h[:,0,:] # [batch_size,d_model]
-        ############################
-
-        # 4. project representation of masked token(s) to vocab size
-        #with tf.variable_scope("fine_tuning"):
-        #    logits = tf.layers.dense(h, self.num_classes)   # shape:[None,self.vocab_size]
-        #    logits = tf.nn.dropout(logits,keep_prob=self.dropout_keep_prob)  # shape:[None,self.num_classes]
-        #return logits # shape:[None,self.num_classes]
-        logits=self.project_tasks(h)
-        return logits
+        return self.project_tasks(h)
 
     def project_tasks_old_1112(self,h):
         """
@@ -169,7 +159,7 @@ class BertCNNFineGrainModel:
         h_split = tf.split(h, self.num_fine_grain_type, axis=1) #a list. length is num_fine_grain, each element is:[None,h_fine_grain]. h_fine_grain=hidden_size/num_fine_grain
         logits_list=[]
         for index, h_sub in enumerate(h_split): # h_sub:[None, h_fine_grain]
-            with tf.variable_scope("project_tasks_"+str(index)):
+            with tf.variable_scope(f"project_tasks_{str(index)}"):
                 logits = tf.layers.dense(h_sub, self.num_fine_grain_value,use_bias=False)  # shape:[None,num_fine_grain_value]
                 logits_list.append(logits)
         print("logits_list[0]:",logits_list[0].shape,";length of logit_list:",len(logits_list))
@@ -189,8 +179,9 @@ class BertCNNFineGrainModel:
         h = tf.layers.dense(h, self.num_fine_grain_type* self.num_fine_grain_value*8, activation=tf.nn.relu, use_bias=True) # [None, num_fine_grain_type*num_fine_grain_value]
         h = tf.layers.dense(h, self.num_fine_grain_type* self.num_fine_grain_value*8, activation=tf.nn.relu, use_bias=True) # [None, num_fine_grain_type*num_fine_grain_value]
 
-        logits = tf.layers.dense(h, self.num_classes, activation=tf.nn.relu, use_bias=False) # [None, num_fine_grain_type*num_fine_grain_value]
-        return logits
+        return tf.layers.dense(
+            h, self.num_classes, activation=tf.nn.relu, use_bias=False
+        )
 
     def loss_lm(self,l2_lambda=0.0001*3):
         # input: `logits` and `labels` must have the same shape `[batch_size, num_classes]`
@@ -202,8 +193,7 @@ class BertCNNFineGrainModel:
         print("#loss_lm.losses:",losses)
         lm_loss = tf.reduce_mean(losses)
         self.l2_loss_lm = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-        loss=lm_loss+self.l2_loss_lm
-        return loss
+        return lm_loss+self.l2_loss_lm
 
     def loss_old_1112(self,l2_lambda=0.0001*3):
         """
@@ -221,8 +211,7 @@ class BertCNNFineGrainModel:
             losses+=loss_sub
         self.losses= losses
         self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-        loss_val=self.losses+self.l2_loss
-        return loss_val
+        return self.losses+self.l2_loss
 
     def loss(self,l2_lambda=0.0001*3):
         """
@@ -231,10 +220,9 @@ class BertCNNFineGrainModel:
         losses= tf.nn.sigmoid_cross_entropy_with_logits(labels=self.input_y,logits=self.logits)  #[batch_size,num_classes]
         loss=tf.reduce_mean(losses)
         self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-        loss_val=loss+self.l2_loss
-        return loss_val
+        return loss+self.l2_loss
 
-    def conv_layers_return_2layers(self, input_x, name_scope, reuse_flag=False):  # great 81.3
+    def conv_layers_return_2layers(self, input_x, name_scope, reuse_flag=False):    # great 81.3
         """main computation graph here: 1.embedding-->2.CONV-RELU-MAX_POOLING-->3.linear classifier"""
         # 1.=====>get emebedding of words in the sentence
         sentence_embeddings_expanded = tf.expand_dims(input_x,
@@ -244,24 +232,31 @@ class BertCNNFineGrainModel:
         # you can use:tf.nn.conv2d;tf.nn.relu;tf.nn.max_pool; feature shape is 4-d. feature is a new variable
         pooled_outputs = []
         for i, filter_size in enumerate(self.filter_sizes):
-            with tf.variable_scope(str(name_scope) + "convolution-pooling-%s" % filter_size, reuse=reuse_flag):
+            with tf.variable_scope(f"{str(name_scope)}convolution-pooling-{filter_size}", reuse=reuse_flag):
                 # 1) CNN->BN->relu
-                filter = tf.get_variable("filter-%s" % filter_size, [filter_size, self.embed_size, 1, self.num_filters],
-                                         initializer=self.initializer)
+                filter = tf.get_variable(
+                    f"filter-{filter_size}",
+                    [filter_size, self.embed_size, 1, self.num_filters],
+                    initializer=self.initializer,
+                )
                 conv = tf.nn.conv2d(sentence_embeddings_expanded, filter, strides=[1, self.stride_length, 1, 1],padding="VALID",name="conv")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
                 conv = tf.contrib.layers.batch_norm(conv, is_training=self.is_training_flag, scope='cnn1')
                 print(i, "conv1:", conv)
-                b = tf.get_variable("b-%s" % filter_size, [self.num_filters])  # ADD 2017-06-09
+                b = tf.get_variable(f"b-{filter_size}", [self.num_filters])
                 h = tf.nn.relu(tf.nn.bias_add(conv, b),"relu")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
 
                 # 2) CNN->BN->relu
                 h = tf.reshape(h, [-1, self.total_sequence_length - filter_size + 1, self.num_filters,1])  # shape:[batch_size,sequence_length-filter_size+1,num_filters,1]
                 # Layer2:CONV-RELU
-                filter2 = tf.get_variable("filter2-%s" % filter_size,[filter_size, self.num_filters, 1, self.num_filters],initializer=self.initializer)
+                filter2 = tf.get_variable(
+                    f"filter2-{filter_size}",
+                    [filter_size, self.num_filters, 1, self.num_filters],
+                    initializer=self.initializer,
+                )
                 conv2 = tf.nn.conv2d(h, filter2, strides=[1, 1, 1, 1], padding="VALID",name="conv2")  # shape:[batch_size,sequence_length-filter_size*2+2,1,num_filters]
                 conv2 = tf.contrib.layers.batch_norm(conv2, is_training=self.is_training_flag, scope='cnn2')
                 print(i, "conv2:", conv2)
-                b2 = tf.get_variable("b2-%s" % filter_size, [self.num_filters])  # ADD 2017-06-09
+                b2 = tf.get_variable(f"b2-{filter_size}", [self.num_filters])
                 h = tf.nn.relu(tf.nn.bias_add(conv2, b2),"relu2")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
 
                 # 3. Max-pooling
@@ -282,8 +277,13 @@ class BertCNNFineGrainModel:
     def train_lm_old(self):
         """based on the loss, use SGD to update parameter"""
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,self.decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val_lm, global_step=self.global_step,learning_rate=learning_rate, optimizer="Adam",clip_gradients=self.clip_gradients)
-        return train_op
+        return tf.contrib.layers.optimize_loss(
+            self.loss_val_lm,
+            global_step=self.global_step,
+            learning_rate=learning_rate,
+            optimizer="Adam",
+            clip_gradients=self.clip_gradients,
+        )
 
     def train_lm(self):
         """based on the loss, use SGD to update parameter"""
@@ -303,8 +303,13 @@ class BertCNNFineGrainModel:
     def train_old(self):
         """based on the loss, use SGD to update parameter"""
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,self.decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val, global_step=self.global_step,learning_rate=learning_rate, optimizer="Adam",clip_gradients=self.clip_gradients)
-        return train_op
+        return tf.contrib.layers.optimize_loss(
+            self.loss_val,
+            global_step=self.global_step,
+            learning_rate=learning_rate,
+            optimizer="Adam",
+            clip_gradients=self.clip_gradients,
+        )
 
     def train(self):
         """based on the loss, use SGD to update parameter"""

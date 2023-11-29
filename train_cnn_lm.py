@@ -53,7 +53,8 @@ tf.app.flags.DEFINE_integer("process_num",35,"number of cpu process")
 
 def main(_):
     vocab_word2index, _= create_or_load_vocabulary(FLAGS.data_path,FLAGS.mask_lm_source_file,FLAGS.vocab_size,test_mode=FLAGS.test_mode,tokenize_style=FLAGS.tokenize_style)
-    vocab_size = len(vocab_word2index);print("bert_pertrain_lm.vocab_size:",vocab_size)
+    vocab_size = len(vocab_word2index)
+    print("bert_pertrain_lm.vocab_size:",vocab_size)
     index2word={v:k for k,v in vocab_word2index.items()}
     #train,valid,test=mask_language_model(FLAGS.mask_lm_source_file,FLAGS.data_path,index2word,max_allow_sentence_length=FLAGS.max_allow_sentence_length,test_mode=FLAGS.test_mode)
     train, valid, test = mask_language_model(FLAGS.mask_lm_source_file, FLAGS.data_path, index2word, max_allow_sentence_length=FLAGS.max_allow_sentence_length,test_mode=FLAGS.test_mode, process_num=FLAGS.process_num)
@@ -72,7 +73,7 @@ def main(_):
         model=BertModel(config)
         #Initialize Save
         saver=tf.train.Saver()
-        if os.path.exists(FLAGS.ckpt_dir+"checkpoint"):
+        if os.path.exists(f"{FLAGS.ckpt_dir}checkpoint"):
             print("Restoring Variables from Checkpoint.")
             saver.restore(sess,tf.train.latest_checkpoint(FLAGS.ckpt_dir))
             for i in range(2): #decay learning rate if necessary.
@@ -109,7 +110,7 @@ def main(_):
                     print("%d\tValid.Epoch %d ValidLoss:%.3f\tAcc_valid:%.3f\t" % (counter,epoch, loss_valid, acc_valid*100))
                     # save model to checkpoint
                     if acc_valid>score_best:
-                        save_path = FLAGS.ckpt_dir + "model.ckpt"
+                        save_path = f"{FLAGS.ckpt_dir}model.ckpt"
                         print("going to save check point.")
                         saver.save(sess, save_path, global_step=epoch)
                         score_best=acc_valid
@@ -130,7 +131,12 @@ def do_eval(sess,model,valid,batch_size):
     if number_examples>10000:
         number_examples=validation_size
     print("do_eval.valid.number_examples:",number_examples)
-    if number_examples>validation_size: valid_X,valid_y,valid_p=valid_X[0:validation_size],valid_y[0:validation_size],valid_p[0:validation_size]
+    if number_examples>validation_size:
+        valid_X, valid_y, valid_p = (
+            valid_X[:validation_size],
+            valid_y[:validation_size],
+            valid_p[:validation_size],
+        )
     eval_loss,eval_counter,eval_acc=0.0,0,0.0
     for start,end in zip(range(0,number_examples,batch_size),range(batch_size,number_examples,batch_size)):
         feed_dict = {model.x_mask_lm: valid_X[start:end],model.y_mask_lm: valid_y[start:end],model.p_mask_lm:valid_p[start:end],

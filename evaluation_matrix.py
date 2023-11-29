@@ -34,10 +34,16 @@ def compute_confuse_matrix(y_targetlabel_list_single,y_logit_array_single,label_
     y_target_labels=get_target_label_short(y_targetlabel_list_single) #e.g. y_targetlabel_list[0]=[2,12,88]
     #y_logit=y_logit_array_single #y_logit_array[0] #[202]
     y_predict_labels=[i for i in range(len(y_logit_array_single)) if y_logit_array_single[i]>=0.50] #TODO 0.5PW e.g.[2,12,13,10]
-    if len(y_predict_labels) < 1: y_predict_labels = [np.argmax(y_logit_array_single)]
+    if not y_predict_labels: y_predict_labels = [np.argmax(y_logit_array_single)]
 
     #if len(y_predict_labels)<1:    y_predict_labels=[np.argmax(y_logit_array_single)] #TODO ADD 2018.05.29
-    if random.choice([x for x in range(random_number)]) ==1:print(name+".y_target_labels:",y_target_labels,";y_predict_labels:",y_predict_labels) #debug purpose
+    if random.choice(list(range(random_number))) == 1:
+        print(
+            f"{name}.y_target_labels:",
+            y_target_labels,
+            ";y_predict_labels:",
+            y_predict_labels,
+        )
 
     #2.count number of TP,FP,FN for each class
     y_labels_unique=[]
@@ -48,9 +54,9 @@ def compute_confuse_matrix(y_targetlabel_list_single,y_logit_array_single,label_
         TP, FP, FN = label_dict[label]
         if label in y_predict_labels and label in y_target_labels:#predict=1,truth=1 (TP)
             TP=TP+1
-        elif label in y_predict_labels and label not in y_target_labels:#predict=1,truth=0(FP)
+        elif label in y_predict_labels:#predict=1,truth=0(FP)
             FP=FP+1
-        elif label not in y_predict_labels and label in y_target_labels:#predict=0,truth=1(FN)
+        elif label in y_target_labels:#predict=0,truth=1(FN)
             FN=FN+1
         label_dict[label] = (TP, FP, FN)
     return label_dict
@@ -72,8 +78,7 @@ def compute_penalty_score_batch(target_deaths, predict_deaths,target_lifeimpriso
     for i in range(length):
         score=compute_penalty_score(target_deaths[i], predict_deaths[i], target_lifeimprisons[i],predict_lifeimprisons[i],target_imprsions[i], predict_imprisons[i])
         score_total=score_total+score
-    score_batch=score_total/float(length)
-    return score_batch
+    return score_total/float(length)
 
 def compute_penalty_score(target_death, predict_death,target_lifeimprison, predict_lifeimprison,target_imprsion, predict_imprison):
     """
@@ -89,8 +94,7 @@ def compute_penalty_score(target_death, predict_death,target_lifeimprison, predi
     score_death=compute_death_lifeimprisonment_score(target_death, predict_death)
     score_lifeimprisonment=compute_death_lifeimprisonment_score(target_lifeimprison, predict_lifeimprison)
     score_imprisonment=compute_imprisonment_score(target_imprsion, predict_imprison)
-    score=((score_death+score_lifeimprisonment+score_imprisonment)/3.0)*(100.0)
-    return score
+    return ((score_death+score_lifeimprisonment+score_imprisonment)/3.0)*(100.0)
 
 def compute_death_lifeimprisonment_score(target,predict):
     """
@@ -100,13 +104,11 @@ def compute_death_lifeimprisonment_score(target,predict):
     :return: score: a scalar
     """
 
-    score=0.0
     target=np.argmax(target)
     predict=np.argmax(predict)
-    if random.choice([x for x in range(random_number)]) == 1:print("death_lifeimprisonment_score.target:", target, ";predict:", predict)
-    if target==predict:
-        score=1.0
-    if random.choice([x for x in range(random_number)]) == 1:print("death_lifeimprisonment_score:",score)
+    if random.choice(list(range(random_number))) == 1:print("death_lifeimprisonment_score.target:", target, ";predict:", predict)
+    score = 1.0 if target==predict else 0.0
+    if random.choice(list(range(random_number))) == 1:print("death_lifeimprisonment_score:",score)
     return score
 
 def compute_imprisonment_score(target_value,predict_value):
@@ -116,7 +118,7 @@ def compute_imprisonment_score(target_value,predict_value):
     :param predict_value:a scalar
     :return: score: a scalar
     """
-    if random.choice([x for x in range(random_number)]) ==1:print("x.imprisonment_score.target_value:",target_value,";predict_value:",predict_value)
+    if random.choice(list(range(random_number))) == 1:print("x.imprisonment_score.target_value:",target_value,";predict_value:",predict_value)
     score=0.0
     v=np.abs(np.log(predict_value+1.0)-np.log(target_value+1.0))
     if v<=0.2:
@@ -131,7 +133,7 @@ def compute_imprisonment_score(target_value,predict_value):
         score=0.2
     else:
         score=0.0
-    if random.choice([x for x in range(random_number)]) ==1:print("imprisonment_score:",score)
+    if random.choice(list(range(random_number))) == 1:print("imprisonment_score:",score)
     return score
 
 def compute_micro_macro(label_dict):
@@ -151,8 +153,9 @@ def compute_f1_micro_use_TFFPFN(label_dict):
     :return: f1_micro: a scalar
     """
     TF_micro_accusation, FP_micro_accusation, FN_micro_accusation =compute_TF_FP_FN_micro(label_dict)
-    f1_micro_accusation = compute_f1(TF_micro_accusation, FP_micro_accusation, FN_micro_accusation,'micro')
-    return f1_micro_accusation
+    return compute_f1(
+        TF_micro_accusation, FP_micro_accusation, FN_micro_accusation, 'micro'
+    )
 
 def compute_f1_macro_use_TFFPFN(label_dict):
     """
@@ -167,10 +170,9 @@ def compute_f1_macro_use_TFFPFN(label_dict):
         f1_score_onelabel=compute_f1(TP,FP,FN,'macro')
         f1_dict[label]=f1_score_onelabel
     f1_score_sum=0.0
-    for label,f1_score in f1_dict.items():
+    for f1_score in f1_dict.values():
         f1_score_sum=f1_score_sum+f1_score
-    f1_score=f1_score_sum/float(num_classes)
-    return f1_score
+    return f1_score_sum/float(num_classes)
 
 #[this function is for debug purpose only]
 def compute_f1_score_write_for_debug(label_dict,label2index):
@@ -198,7 +200,7 @@ def compute_f1_score_write_for_debug(label_dict,label2index):
 
     for tuplee in tuple_list:
         label_name,f1_score=tuplee
-        write_object.write(label_name+":"+str(f1_score)+"\n")
+        write_object.write(f"{label_name}:{str(f1_score)}" + "\n")
     write_object.close()
     return f1score_dict
 
@@ -214,7 +216,16 @@ def compute_f1(TP,FP,FN,compute_type):
     recall=TP/(TP+FN+small_value)
     f1_score=(2*precison*recall)/(precison+recall+small_value)
 
-    if random.choice([x for x in range(500)]) == 1:print(compute_type,"precison:",str(precison),";recall:",str(recall),";f1_score:",f1_score)
+    if random.choice(list(range(500))) == 1:
+        print(
+            compute_type,
+            "precison:",
+            precison,
+            ";recall:",
+            recall,
+            ";f1_score:",
+            f1_score,
+        )
 
     return f1_score
 
@@ -238,10 +249,7 @@ def init_label_dict(num_classes):
     :param num_classes:
     :return: label_dict: a dict. {label_index:(0,0,0)}
     """
-    label_dict={}
-    for i in range(num_classes):
-        label_dict[i]=(0,0,0)
-    return label_dict
+    return {i: (0,0,0) for i in range(num_classes)}
 
 def get_target_label_short(y_mulitihot):
     """
@@ -249,8 +257,4 @@ def get_target_label_short(y_mulitihot):
     :param y_mulitihot: [0,0,1,0,1,0,...]
     :return: taget_list.e.g. [3,5,100]
     """
-    taget_list = [];
-    for i, element in enumerate(y_mulitihot):
-        if element == 1:
-            taget_list.append(i)
-    return taget_list
+    return [i for i, element in enumerate(y_mulitihot) if element == 1]

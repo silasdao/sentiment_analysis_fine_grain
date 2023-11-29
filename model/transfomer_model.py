@@ -72,9 +72,7 @@ class TransformerModel:
                               self.input_representation,dropout_keep_prob=self.dropout_keep_prob,use_residual_conn=self.use_residual_conn)
         h = encoder_class.encoder_fn() # [batch_size,sequence_length,d_model]
 
-        # 3. get logits for different tasks by applying projection layer
-        logits=self.project_tasks(h) # shape:[None,self.num_classes]
-        return logits # shape:[None,self.num_classes]
+        return self.project_tasks(h)
 
     def project_tasks(self,h):
         """
@@ -97,14 +95,18 @@ class TransformerModel:
         self.losses = tf.reduce_mean((tf.reduce_sum(losses,axis=1)))  # shape=(?,)-->(). loss for all data in the batch-->single loss
         self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
 
-        loss=self.losses+self.l2_loss
-        return loss
+        return self.losses+self.l2_loss
 
     def train(self):
         """based on the loss, use SGD to update parameter"""
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,self.decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val, global_step=self.global_step,learning_rate=learning_rate, optimizer="Adam",clip_gradients=self.clip_gradients)
-        return train_op
+        return tf.contrib.layers.optimize_loss(
+            self.loss_val,
+            global_step=self.global_step,
+            learning_rate=learning_rate,
+            optimizer="Adam",
+            clip_gradients=self.clip_gradients,
+        )
 
     def instantiate_weights(self):
         """define all weights here"""
@@ -124,7 +126,7 @@ def train():
     gpu_config = tf.ConfigProto()
     gpu_config.gpu_options.allow_growth = True
     saver = tf.train.Saver()
-    save_path = config.ckpt_dir + "model.ckpt"
+    save_path = f"{config.ckpt_dir}model.ckpt"
     #if not os.path.exists(config.ckpt_dir):
     #    os.makedirs(config.ckpt_dir)
     with tf.Session(config=gpu_config) as sess:
@@ -159,7 +161,7 @@ def predict():
     with tf.Session(config=gpu_config) as sess:
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, tf.train.latest_checkpoint(ckpt_dir))
-        for i in range(100):
+        for _ in range(100):
             # 2.feed data
             input_x = np.random.randn(config.batch_size, config.sequence_length)  # [None, self.sequence_length]
             input_x[input_x >= 0] = 1
@@ -185,10 +187,7 @@ def generate_label(input_x,threshold):
         sum=np.sum(input_single)
         if i == 0:print("sum:",sum,";threshold:",threshold)
         y_single=1 if sum>threshold else 0
-        if y_single==1:
-            y[i]=[0,1]
-        else: # y_single=0
-            y[i]=[1,0]
+        y[i] = [0,1] if y_single==1 else [1,0]
     return y
 
 #train()

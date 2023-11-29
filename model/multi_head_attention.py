@@ -49,11 +49,9 @@ class MultiHeadAttention(object):
         batch_size,h,length,d_v=dot_product.get_shape().as_list()
         #print("dot_product:",dot_product,";self.sequence_length:",self.sequence_length) ##dot_product:(128, 8, 6, 64);5
         dot_product=tf.reshape(dot_product,shape=(-1,length,self.d_model)) # [batch,sequence_length,d_model]
-        # 4. linear projection
-        output=tf.layers.dense(dot_product,units=self.d_model) # [batch,sequence_length,d_model]
-        return output  #[batch,sequence_length,d_model]
+        return tf.layers.dense(dot_product,units=self.d_model)
 
-    def scaled_dot_product_attention_batch_mine(self,Q,K_s,V_s): #my own implementation of scaled dot product attention.
+    def scaled_dot_product_attention_batch_mine(self,Q,K_s,V_s):    #my own implementation of scaled dot product attention.
         """
         scaled dot product attention
         :param Q:  query.  shape:[batch,sequence_length,d_model]
@@ -77,11 +75,9 @@ class MultiHeadAttention(object):
             dot_product=dot_product+mask   # [batch,h,sequence_length,1]
         # 4. get possibility
         p=tf.nn.softmax(dot_product)                                  # [batch,h,sequence_length,1]
-        # 5. final output
-        output=tf.multiply(p,V_heads)                                 # [batch,h,sequence_length,d_k]
-        return output                                                 # [batch,h,sequence_length,d_k]
+        return tf.multiply(p,V_heads)
 
-    def scaled_dot_product_attention_batch(self, Q, K_s, V_s):# scaled dot product attention: implementation style like tensor2tensor from google
+    def scaled_dot_product_attention_batch(self, Q, K_s, V_s):    # scaled dot product attention: implementation style like tensor2tensor from google
         """
         scaled dot product attention
         :param Q:  query.  shape:[batch,sequence_length,d_model]
@@ -109,9 +105,7 @@ class MultiHeadAttention(object):
         weights=tf.nn.softmax(dot_product)                                      # [batch,h,sequence_length,sequence_length]
         # drop out weights
         weights=tf.nn.dropout(weights,1.0-self.dropout_rate)                    # [batch,h,sequence_length,sequence_length]
-        # 5. final output
-        output=tf.matmul(weights,V_heads)                                       # [batch,h,sequence_length,d_v]
-        return output
+        return tf.matmul(weights,V_heads)
 
 
 #vectorized implementation of multi head attention for sentences with batch
@@ -134,7 +128,7 @@ def multi_head_attention_for_sentence_vectorized(layer_number):
     input_x = tf.placeholder(tf.int32, [batch_size,sequence_length], name="input_x")
     embedded_words = tf.nn.embedding_lookup(Embedding, input_x) #[batch_size,sequence_length,embed_size]
     mask=get_mask(batch_size,sequence_length) #tf.ones((batch_size,sequence_length))*-1e8  #[batch,sequence_length]
-    with tf.variable_scope("query_at_each_sentence"+str(layer_number)):
+    with tf.variable_scope(f"query_at_each_sentence{str(layer_number)}"):
         Q = embedded_words  # [batch_size*sequence_length,embed_size]
         K_s=embedded_words #[batch_size*sequence_length,embed_size]
         V_s=embedded_words #tf.get_variable("V_s_original_", shape=embedded_words.get_shape().as_list(),initializer=initializer) #[batch_size,sequence_length,embed_size]

@@ -62,8 +62,11 @@ def main(_):
     # 1.load vocabulary of token from cache file save from pre-trained stage; load label dict from training file; print some message.
     vocab_word2index, _= create_or_load_vocabulary(FLAGS.data_path,FLAGS.training_data_file,FLAGS.vocab_size,test_mode=FLAGS.test_mode,tokenize_style=FLAGS.tokenize_style,model_name=FLAGS.model_name)
     label2index=get_lable2index(FLAGS.data_path,FLAGS.training_data_file, tokenize_style=FLAGS.tokenize_style)
-    vocab_size = len(vocab_word2index);print("cnn_model.vocab_size:",vocab_size);num_classes=len(label2index);print("num_classes:",num_classes)
-    iii=0;iii/0 # todo test first two function, then continue
+    vocab_size = len(vocab_word2index)
+    print("cnn_model.vocab_size:",vocab_size)
+    num_classes=len(label2index)
+    print("num_classes:",num_classes)
+    1
     # load training data.
     train,valid, test= load_data_multilabel(FLAGS.data_path,FLAGS.training_data_file,FLAGS.valid_data_file,FLAGS.test_data_file,vocab_word2index,label2index,FLAGS.sequence_length,
                                             process_num=FLAGS.process_num,test_mode=FLAGS.test_mode,tokenize_style=FLAGS.tokenize_style)
@@ -80,11 +83,14 @@ def main(_):
         model=BertModel(config)
         #Initialize Save
         saver=tf.train.Saver()
-        if os.path.exists(FLAGS.ckpt_dir+"checkpoint"):
+        if os.path.exists(f"{FLAGS.ckpt_dir}checkpoint"):
             print("Restoring Variables from Checkpoint.")
             sess.run(tf.global_variables_initializer())
             for i in range(6): #decay learning rate if necessary.
-                print(i,"Going to decay learning rate by a factor of "+str(FLAGS.decay_rate))
+                print(
+                    i,
+                    f"Going to decay learning rate by a factor of {str(FLAGS.decay_rate)}",
+                )
                 sess.run(model.learning_rate_decay_half_op)
             # restore those variables that names and shapes exists in your model from checkpoint. for detail check: https://gist.github.com/iganichev/d2d8a0b1abc6b15d4a07de83171163d4
             optimistic_restore(sess, tf.train.latest_checkpoint(FLAGS.ckpt_dir)) #saver.restore(sess,tf.train.latest_checkpoint(FLAGS.ckpt_dir))
@@ -120,7 +126,7 @@ def main(_):
 
                     # save model to checkpoint
                     if f1_score_valid>score_best:
-                        save_path = FLAGS.ckpt_dir_save + "model.ckpt"
+                        save_path = f"{FLAGS.ckpt_dir_save}model.ckpt"
                         print("going to save check point.")
                         saver.save(sess, save_path, global_step=epoch)
                         score_best=f1_score_valid
@@ -136,11 +142,11 @@ def main(_):
                 print("Valid.Epoch %d ValidLoss:%.3f\tF1 score:%.3f\tMacro_f1:%.3f\tMicro_f1:%.3f\t"% (epoch,loss_valid,f1_score_valid2,f1_macro_valid2,f1_micro_valid2))
                 #save model to checkpoint
                 if f1_score_valid2 > score_best:
-                    save_path=FLAGS.ckpt_dir_save+"model.ckpt"
+                    save_path = f"{FLAGS.ckpt_dir_save}model.ckpt"
                     print("going to save check point.")
                     saver.save(sess,save_path,global_step=epoch)
                     score_best = f1_score_valid2
-            if (epoch == 2 or epoch == 4 or epoch == 6 or epoch == 9 or epoch == 13):
+            if epoch in [2, 4, 6, 9, 13]:
                 for i in range(1):
                     print(i, "Going to decay learning rate by half.")
                     sess.run(model.learning_rate_decay_half_op)
@@ -163,7 +169,7 @@ def do_eval(sess,model,valid,num_classes,label2index):
     :return:
     """
     number_examples=valid[0].shape[0]
-    valid=valid[0:64*15] # todo
+    valid = valid[:64*15]
     valid_x,valid_y=valid
     print("number_examples:",number_examples)
     eval_loss,eval_counter=0.0,0

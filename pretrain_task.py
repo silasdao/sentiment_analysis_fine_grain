@@ -45,7 +45,7 @@ def mask_language_model(source_file,target_file,index2word,max_allow_sentence_le
     """
     # 1. read source file
     t1 = time.clock()
-    cache_file=target_file + 'mask_lm.pik'
+    cache_file = f'{target_file}mask_lm.pik'
     if os.path.exists(cache_file):
         with open(cache_file, 'rb') as data_f:
             print("going to load cache file of masked language model.")
@@ -58,8 +58,8 @@ def mask_language_model(source_file,target_file,index2word,max_allow_sentence_le
     source_object=open(source_file,'r')
     source_lines=source_object.readlines()
     if test_mode:
-        source_lines=source_lines[0:1000]
-    list_indices = [i for i in range(max_allow_sentence_length)]
+        source_lines = source_lines[:1000]
+    list_indices = list(range(max_allow_sentence_length))
     count=0
     vocab_size=len(index2word)
     word2index={v:k for k,v in index2word.items()}
@@ -71,7 +71,7 @@ def mask_language_model(source_file,target_file,index2word,max_allow_sentence_le
             string_list=[x for x in jieba.lcut(sentence.strip()) if x and x not in ["\"","：","、","，","）","（"]]
             sentence_length=len(string_list)
             if sentence_length>max_allow_sentence_length: # string list is longer then sentence_length
-                string_list=string_list[0:max_allow_sentence_length]
+                string_list = string_list[:max_allow_sentence_length]
             else: # ignore short sentence currently, temporary
                 continue
             # the training data generator chooses 15% of tokens at random,e.g., in the sentence my dog is hairy it chooses hairy.
@@ -99,13 +99,17 @@ def mask_language_model(source_file,target_file,index2word,max_allow_sentence_le
             if i%1000==0:
                 print(count,"index:",index,"i:",i,"j:",j,";mask_word_1:",mask_word,";string_list:",string_list)
                 print(count,"index:",index,"i:",i,"j:",j,";mask_word_indexed:",mask_word_indexed,";string_list_indexed:",string_list_indexed)
-            #if count%101==0: break
+                    #if count%101==0: break
 
     # 5. split data into train/valid/test, and save to file system
     num_examples=len(X_mask_lm)
     num_train_index=int(0.9*num_examples)
     num_valid_index=int(0.95*num_examples)
-    X_mask_lm_train,y_mask_lm_train,p_mask_lm_train=X_mask_lm[0:num_train_index],y_mask_lm[0:num_train_index],p_mask_lm[0:num_train_index]
+    X_mask_lm_train, y_mask_lm_train, p_mask_lm_train = (
+        X_mask_lm[:num_train_index],
+        y_mask_lm[:num_train_index],
+        p_mask_lm[:num_train_index],
+    )
     X_mask_lm_valid,y_mask_lm_valid,p_mask_lm_valid=X_mask_lm[num_train_index:num_valid_index],y_mask_lm[num_train_index:num_valid_index],p_mask_lm[num_train_index:num_valid_index]
     X_mask_lm_test,y_mask_lm_test,p_mask_lm_test=X_mask_lm[num_valid_index:],y_mask_lm[num_valid_index:],p_mask_lm[num_valid_index:]
     train=get_data_as_array(X_mask_lm_train,y_mask_lm_train,p_mask_lm_train)
@@ -151,7 +155,7 @@ def mask_language_model_multi_processing(source_file,target_file,index2word,max_
     """
     # 1. read source file
     t1 = time.clock()
-    cache_file=target_file + 'mask_lm.pik'
+    cache_file = f'{target_file}mask_lm.pik'
     if os.path.exists(cache_file):
         with open(cache_file, 'rb') as data_f:
             print("going to load cache file of masked language model.")
@@ -161,7 +165,7 @@ def mask_language_model_multi_processing(source_file,target_file,index2word,max_
     source_object=open(source_file,'r')
     source_lines=source_object.readlines()
     if test_mode:
-        source_lines=source_lines[0:1000]
+        source_lines = source_lines[:1000]
 
     # 2.multi-processing to process lines #############################################################################
     # 2.1 get chunks as list.
@@ -169,7 +173,7 @@ def mask_language_model_multi_processing(source_file,target_file,index2word,max_
     pool = multiprocessing.Pool(processes=process_num)
     # 2.2 use multiprocessing to handle different chunk. each chunk will be transformed and save to file system.
     for chunk_id, each_chunk in enumerate(chunks):
-        file_name= data_path+"training_data_temp_lm_" + str(chunk_id)
+        file_name = f"{data_path}training_data_temp_lm_{str(chunk_id)}"
         # 3.3 apply_async
         print("#mask_language_model_multi_processing.length of chunk:",len(each_chunk),";file_name:",file_name,";chunk_id:",chunk_id)
         pool.apply_async(process_one_chunk_lm,args=(each_chunk,max_allow_sentence_length,index2word,file_name)) # apply_async
@@ -182,16 +186,16 @@ def mask_language_model_multi_processing(source_file,target_file,index2word,max_
     y_mask_lm=[]
     p_mask_lm=[]
     for chunk_id in range(process_num):
-        file_name_X =data_path+"training_data_temp_lm_" + str(chunk_id)+'_X_mask_lm.npy'
-        file_name_y =data_path+"training_data_temp_lm_" + str(chunk_id)+'_y_mask_lm.npy'
-        file_name_p =data_path+"training_data_temp_lm_" + str(chunk_id)+'_p_mask_lm.npy'
+        file_name_X = f"{data_path}training_data_temp_lm_{str(chunk_id)}_X_mask_lm.npy"
+        file_name_y = f"{data_path}training_data_temp_lm_{str(chunk_id)}_y_mask_lm.npy"
+        file_name_p = f"{data_path}training_data_temp_lm_{str(chunk_id)}_p_mask_lm.npy"
         x_sub=np.load(file_name_X)
         y_sub=np.load(file_name_y)
         p_sub=np.load(file_name_p)
         X_mask_lm.extend(x_sub)
         y_mask_lm.extend(y_sub)
         p_mask_lm.extend(p_sub)
-        command = 'rm ' + file_name_X+" "+file_name_y+" "+file_name_p
+        command = f'rm {file_name_X} {file_name_y} {file_name_p}'
         os.system(command)
     # 2.multi-processing to process lines #############################################################################
 
@@ -199,7 +203,11 @@ def mask_language_model_multi_processing(source_file,target_file,index2word,max_
     num_examples=len(X_mask_lm)
     num_train_index=int(0.9*num_examples)
     num_valid_index=int(0.95*num_examples)
-    X_mask_lm_train,y_mask_lm_train,p_mask_lm_train=X_mask_lm[0:num_train_index],y_mask_lm[0:num_train_index],p_mask_lm[0:num_train_index]
+    X_mask_lm_train, y_mask_lm_train, p_mask_lm_train = (
+        X_mask_lm[:num_train_index],
+        y_mask_lm[:num_train_index],
+        p_mask_lm[:num_train_index],
+    )
     X_mask_lm_valid,y_mask_lm_valid,p_mask_lm_valid=X_mask_lm[num_train_index:num_valid_index],y_mask_lm[num_train_index:num_valid_index],p_mask_lm[num_train_index:num_valid_index]
     X_mask_lm_test,y_mask_lm_test,p_mask_lm_test=X_mask_lm[num_valid_index:],y_mask_lm[num_valid_index:],p_mask_lm[num_valid_index:]
     train=get_data_as_array(X_mask_lm_train,y_mask_lm_train,p_mask_lm_train)
@@ -220,7 +228,7 @@ def process_one_chunk_lm(lines,max_allow_sentence_length,index2word,sub_target_f
     :return:
     """
     print("process_one_chunk_lm.started...")
-    list_indices = [i for i in range(max_allow_sentence_length)]
+    list_indices = list(range(max_allow_sentence_length))
     word2index={v:k for k,v in index2word.items()}
     X_mask_lm=[]
     y_mask_lm=[]
@@ -232,7 +240,7 @@ def process_one_chunk_lm(lines,max_allow_sentence_length,index2word,sub_target_f
             string_list = [x for x in jieba.lcut(sentence.strip()) if x and x not in ["\"", "：", "、", "，", "）", "（"]]
             sentence_length = len(string_list)
             if sentence_length > max_allow_sentence_length:  # string list is longer then sentence_length
-                string_list = string_list[0:max_allow_sentence_length]
+                string_list = string_list[:max_allow_sentence_length]
             else:  # ignore short sentence currently, temporary
                 continue
             # the training data generator chooses 15% of tokens at random,e.g., in the sentence my dog is hairy it chooses hairy.
@@ -264,10 +272,13 @@ def process_one_chunk_lm(lines,max_allow_sentence_length,index2word,sub_target_f
     X_mask_lm=np.array(X_mask_lm)
     y_mask_lm=np.array(y_mask_lm)
     p_mask_lm=np.array(p_mask_lm)
-    np.save(sub_target_file_path+'_X_mask_lm.npy',X_mask_lm) # file_name_X =data_path+"training_data_temp_lm_" + str(chunk_id)+'_X_mask_lm.npy'
-    np.save(sub_target_file_path+'_y_mask_lm.npy',y_mask_lm)
-    np.save(sub_target_file_path+'_p_mask_lm.npy',p_mask_lm)
-    print("process_one_chunk_lm.ended.file saved:",sub_target_file_path+'_X_mask_lm.npy')
+    np.save(f'{sub_target_file_path}_X_mask_lm.npy', X_mask_lm)
+    np.save(f'{sub_target_file_path}_y_mask_lm.npy', y_mask_lm)
+    np.save(f'{sub_target_file_path}_p_mask_lm.npy', p_mask_lm)
+    print(
+        "process_one_chunk_lm.ended.file saved:",
+        f'{sub_target_file_path}_X_mask_lm.npy',
+    )
 
 def get_data_as_array(X_mask_lm_train,y_mask_lm_train,p_mask_lm_train):
     """
@@ -281,8 +292,8 @@ def get_data_as_array(X_mask_lm_train,y_mask_lm_train,p_mask_lm_train):
 
 source_file='./data/l_20181024_union.txt'
 data_path='./data/'
-traning_data_path=data_path+'l_20181024_union.txt'
-valid_data_path=data_path+'l_20181024_union_valid.txt'
+traning_data_path = f'{data_path}l_20181024_union.txt'
+valid_data_path = f'{data_path}l_20181024_union_valid.txt'
 test_data_path=valid_data_path
 vocab_size=50000
 process_num=5

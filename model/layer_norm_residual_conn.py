@@ -14,17 +14,13 @@ class LayerNormResidualConnection(object):
 
     #call residual connection and layer normalization
     def layer_norm_residual_connection(self):
-        #print("LayerNormResidualConnection.use_residual_conn:",self.use_residual_conn)
-        if self.use_residual_conn: # todo previously it is removed in a classification task, may be because result become not stable
-            x_residual=self.residual_connection()
-            x_layer_norm=self.layer_normalization(x_residual)
-        else:
-            x_layer_norm = self.layer_normalization(self.x)
-        return x_layer_norm
+        if not self.use_residual_conn:
+            return self.layer_normalization(self.x)
+        x_residual=self.residual_connection()
+        return self.layer_normalization(x_residual)
 
     def residual_connection(self):
-        output=self.x + tf.nn.dropout(self.y, 1.0 - self.residual_dropout)
-        return output
+        return self.x + tf.nn.dropout(self.y, 1.0 - self.residual_dropout)
 
     # layer normalize the tensor x, averaging over the last dimension.
     def layer_normalization(self,x):
@@ -34,7 +30,7 @@ class LayerNormResidualConnection(object):
         """
         filter=x.get_shape()[-1] #last dimension of x. e.g. 512
         #print("layer_normalization:==================>variable_scope:","layer_normalization"+str(self.layer_index))
-        with tf.variable_scope("layer_normalization"+str(self.layer_index)):
+        with tf.variable_scope(f"layer_normalization{str(self.layer_index)}"):
             # 1. normalize input by using  mean and variance according to last dimension
             mean=tf.reduce_mean(x,axis=-1,keepdims=True) #[batch_size,sequence_length,1]
             variance=tf.reduce_mean(tf.square(x-mean),axis=-1,keepdims=True) #[batch_size,sequence_length,1]
@@ -42,8 +38,7 @@ class LayerNormResidualConnection(object):
             # 2. re-scale normalized input back
             scale=tf.get_variable("layer_norm_scale",[filter],initializer=tf.ones_initializer) #[filter]
             bias=tf.get_variable("layer_norm_bias",[filter],initializer=tf.ones_initializer) #[filter]
-            output=norm_x*scale+bias #[batch_size,sequence_length,d_model]
-            return output #[batch_size,sequence_length,d_model]
+            return norm_x*scale+bias
 
 def test():
     start = time.time()

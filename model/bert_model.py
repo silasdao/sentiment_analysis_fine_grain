@@ -163,8 +163,7 @@ class BertModel:
         print("#loss_lm.losses:",losses)
         lm_loss = tf.reduce_mean(losses)
         self.l2_loss_lm = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-        loss=lm_loss+self.l2_loss_lm
-        return loss
+        return lm_loss+self.l2_loss_lm
 
     def loss(self,l2_lambda=0.0001*3):
         # input: `logits` and `labels` must have the same shape `[batch_size, num_classes]`
@@ -174,20 +173,29 @@ class BertModel:
         self.losses = tf.reduce_mean((tf.reduce_sum(losses,axis=1)))  # shape=(?,)-->(). loss for all data in the batch-->single loss
         self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
 
-        loss=self.losses+self.l2_loss
-        return loss
+        return self.losses+self.l2_loss
 
     def train_lm(self):
         """based on the loss, use SGD to update parameter"""
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,self.decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val_lm, global_step=self.global_step,learning_rate=learning_rate, optimizer="Adam",clip_gradients=self.clip_gradients)
-        return train_op
+        return tf.contrib.layers.optimize_loss(
+            self.loss_val_lm,
+            global_step=self.global_step,
+            learning_rate=learning_rate,
+            optimizer="Adam",
+            clip_gradients=self.clip_gradients,
+        )
 
     def train(self):
         """based on the loss, use SGD to update parameter"""
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,self.decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val, global_step=self.global_step,learning_rate=learning_rate, optimizer="Adam",clip_gradients=self.clip_gradients)
-        return train_op
+        return tf.contrib.layers.optimize_loss(
+            self.loss_val,
+            global_step=self.global_step,
+            learning_rate=learning_rate,
+            optimizer="Adam",
+            clip_gradients=self.clip_gradients,
+        )
 
     def instantiate_weights(self):
         """define all weights here"""
@@ -211,7 +219,7 @@ def train():
     gpu_config = tf.ConfigProto()
     gpu_config.gpu_options.allow_growth = True
     saver = tf.train.Saver()
-    save_path = config.ckpt_dir + "model.ckpt"
+    save_path = f"{config.ckpt_dir}model.ckpt"
     batch_size=8
     #if not os.path.exists(config.ckpt_dir):
     #    os.makedirs(config.ckpt_dir)
@@ -225,7 +233,7 @@ def train():
             input_x[input_x >= 0] = 1
             input_x[input_x < 0] = 0
             input_y = generate_label(input_x,threshold)
-            p_mask_lm=[i for i in range(batch_size)]
+            p_mask_lm = list(range(batch_size))
             # 3.run session to train the model, print some logs.
             loss, _ = sess.run([model.loss_val,  model.train_op],feed_dict={model.x_mask_lm: input_x, model.y_mask_lm: input_y,model.p_mask_lm:p_mask_lm,
                                                                             model.dropout_keep_prob: config.dropout_keep_prob})
@@ -249,7 +257,7 @@ def predict():
     with tf.Session(config=gpu_config) as sess:
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, tf.train.latest_checkpoint(ckpt_dir))
-        for i in range(100):
+        for _ in range(100):
             # 2.feed data
             input_x = np.random.randn(config.batch_size, config.sequence_length)  # [None, self.sequence_length]
             input_x[input_x >= 0] = 1
@@ -275,10 +283,7 @@ def generate_label(input_x,threshold):
         sum=np.sum(input_single)
         if i == 0:print("sum:",sum,";threshold:",threshold)
         y_single=1 if sum>threshold else 0
-        if y_single==1:
-            y[i]=[0,1]
-        else: # y_single=0
-            y[i]=[1,0]
+        y[i] = [0,1] if y_single==1 else [1,0]
     return y
 
 #train()

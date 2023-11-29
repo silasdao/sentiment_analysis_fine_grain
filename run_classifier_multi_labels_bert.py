@@ -187,10 +187,7 @@ class DataProcessor(object):
     """Reads a tab separated value file."""
     with tf.gfile.Open(input_file, "r") as f:
       reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
-      lines = []
-      for line in reader:
-        lines.append(line)
-      return lines
+      return list(reader)
 
 
 class XnliProcessor(DataProcessor):
@@ -203,7 +200,7 @@ class XnliProcessor(DataProcessor):
     """See base class."""
     lines = self._read_tsv(
         os.path.join(data_dir, "multinli",
-                     "multinli.train.%s.tsv" % self.language))
+                     f"multinli.train.{self.language}.tsv"))
     examples = []
     for (i, line) in enumerate(lines):
       if i == 0:
@@ -270,7 +267,7 @@ class MnliProcessor(DataProcessor):
     for (i, line) in enumerate(lines):
       if i == 0:
         continue
-      guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(line[0]))
+      guid = f"{set_type}-{tokenization.convert_to_unicode(line[0])}"
       text_a = tokenization.convert_to_unicode(line[8])
       text_b = tokenization.convert_to_unicode(line[9])
       if set_type == "test":
@@ -310,13 +307,10 @@ class MrpcProcessor(DataProcessor):
     for (i, line) in enumerate(lines):
       if i == 0:
         continue
-      guid = "%s-%s" % (set_type, i)
+      guid = f"{set_type}-{i}"
       text_a = tokenization.convert_to_unicode(line[3])
       text_b = tokenization.convert_to_unicode(line[4])
-      if set_type == "test":
-        label = "0"
-      else:
-        label = tokenization.convert_to_unicode(line[0])
+      label = "0" if set_type == "test" else tokenization.convert_to_unicode(line[0])
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples
@@ -351,7 +345,7 @@ class ColaProcessor(DataProcessor):
       # Only the test set has a header
       if set_type == "test" and i == 0:
         continue
-      guid = "%s-%s" % (set_type, i)
+      guid = f"{set_type}-{i}"
       if set_type == "test":
         text_a = tokenization.convert_to_unicode(line[1])
         label = "0"
@@ -386,8 +380,7 @@ class SentimentAnalysisFineGrainProcessor(DataProcessor):
     #num_aspect=FLAGS.num_aspects
     aspect_value_list=FLAGS.aspect_value_list #[-2,-1,0,1]
     for i in range(20):
-        for value in aspect_value_list:
-            label_list.append(str(i) + "_" + str(value))
+      label_list.extend(f"{str(i)}_{str(value)}" for value in aspect_value_list)
     return label_list #[ {'0_-2': 0, '0_-1': 1, '0_0': 2, '0_1': 3,....'19_-2': 76, '19_-1': 77, '19_0': 78, '19_1': 79}]
 
   def _create_examples(self, lines, set_type):
@@ -397,7 +390,7 @@ class SentimentAnalysisFineGrainProcessor(DataProcessor):
       # Only the test set has a header
       if set_type == "test" and i == 0:
         continue
-      guid = "%s-%s" % (set_type, i)
+      guid = f"{set_type}-{i}"
       #if set_type == "test":
       #  text_a = tokenization.convert_to_unicode(line[1])
       #  label = "0"
@@ -441,7 +434,7 @@ class SentencePairClassificationProcessor(DataProcessor):
     for (i, line) in enumerate(lines):
       if i == 0:
         continue
-      guid = "%s-%s" % (set_type, i)
+      guid = f"{set_type}-{i}"
       label = tokenization.convert_to_unicode(line[0])
       text_a = tokenization.convert_to_unicode(line[1])
       text_b = tokenization.convert_to_unicode(line[2])
@@ -452,47 +445,19 @@ class SentencePairClassificationProcessor(DataProcessor):
 def convert_single_example(ex_index, example, label_list, max_seq_length,
                            tokenizer):
   """Converts a single `InputExample` into a single `InputFeatures`."""
-  label_map = {}
-  for (i, label) in enumerate(label_list):
-    label_map[label] = i
-
+  label_map = {label: i for i, label in enumerate(label_list)}
   tokens_a = tokenizer.tokenize(example.text_a)
-  tokens_b = None
-  if example.text_b:
-    tokens_b = tokenizer.tokenize(example.text_b)
-
+  tokens_b = tokenizer.tokenize(example.text_b) if example.text_b else None
   if tokens_b:
     # Modifies `tokens_a` and `tokens_b` in place so that the total
     # length is less than the specified length.
     # Account for [CLS], [SEP], [SEP] with "- 3"
     _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
-  else:
-    # Account for [CLS] and [SEP] with "- 2"
-    if len(tokens_a) > max_seq_length - 2:
-      tokens_a = tokens_a[0:(max_seq_length - 2)]
+  elif len(tokens_a) > max_seq_length - 2:
+    tokens_a = tokens_a[:max_seq_length - 2]
 
-  # The convention in BERT is:
-  # (a) For sequence pairs:
-  #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-  #  type_ids: 0     0  0    0    0     0       0 0     1  1  1  1   1 1
-  # (b) For single sequences:
-  #  tokens:   [CLS] the dog is hairy . [SEP]
-  #  type_ids: 0     0   0   0  0     0 0
-  #
-  # Where "type_ids" are used to indicate whether this is the first
-  # sequence or the second sequence. The embedding vectors for `type=0` and
-  # `type=1` were learned during pre-training and are added to the wordpiece
-  # embedding vector (and position vector). This is not *strictly* necessary
-  # since the [SEP] token unambiguously separates the sequences, but it makes
-  # it easier for the model to learn the concept of sequences.
-  #
-  # For classification tasks, the first vector (corresponding to [CLS]) is
-  # used as as the "sentence vector". Note that this only makes sense because
-  # the entire model is fine-tuned.
-  tokens = []
-  segment_ids = []
-  tokens.append("[CLS]")
-  segment_ids.append(0)
+  tokens = ["[CLS]"]
+  segment_ids = [0]
   for token in tokens_a:
     tokens.append(token)
     segment_ids.append(0)
@@ -524,35 +489,35 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
   #print("label_map:",label_map,";length of label_map:",len(label_map))
   label_id=None
   if "," in example.label: # multiple label
-      # get list of label
-      label_id_list=[]
-      label_list=example.label.split(",")
-      for label_ in label_list:
-          label_id_list.append(label_map[label_])
+    label_list=example.label.split(",")
+    label_id_list = [label_map[label_] for label_ in label_list]
       #print("label_id_list:",label_id_list)
       # convert to multi-hot style
-      label_id=[0 for l in range(len(label_map))]
-      for j, label_index in enumerate(label_id_list):
-          label_id[label_index]=1
+    label_id = [0 for _ in range(len(label_map))]
+    for label_index in label_id_list:
+      label_id[label_index]=1
   else: # single label
-      label_id = label_map[example.label]
+    label_id = label_map[example.label]
   if ex_index < 5:
     tf.logging.info("*** Example ***")
-    tf.logging.info("guid: %s" % (example.guid))
-    tf.logging.info("tokens: %s" % " ".join(
-        [tokenization.printable_text(x) for x in tokens]))
-    tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-    tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-    tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-    if "," in example.label: tf.logging.info("label: %s (id_list = %s)" % (str(example.label), str(label_id_list))) # if label_id is a list, try print multi-hot value: label_id_list
-    tf.logging.info("label: %s (id = %s)" % (str(example.label), str(label_id))) # %d
+    tf.logging.info(f"guid: {example.guid}")
+    tf.logging.info(
+        f'tokens: {" ".join([tokenization.printable_text(x) for x in tokens])}'
+    )
+    tf.logging.info(f'input_ids: {" ".join([str(x) for x in input_ids])}')
+    tf.logging.info(f'input_mask: {" ".join([str(x) for x in input_mask])}')
+    tf.logging.info(f'segment_ids: {" ".join([str(x) for x in segment_ids])}')
+    if "," in example.label:
+      tf.logging.info(
+          f"label: {str(example.label)} (id_list = {str(label_id_list)})")
+    tf.logging.info(f"label: {str(example.label)} (id = {str(label_id)})")
 
-  feature = InputFeatures(
+  return InputFeatures(
       input_ids=input_ids,
       input_mask=input_mask,
       segment_ids=segment_ids,
-      label_id=label_id)
-  return feature
+      label_id=label_id,
+  )
 
 
 def file_based_convert_examples_to_features(
@@ -761,7 +726,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
     tf.logging.info("*** Features ***")
     for name in sorted(features.keys()):
-      tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
+      tf.logging.info(f"  name = {name}, shape = {features[name].shape}")
 
     input_ids = features["input_ids"]
     input_mask = features["input_mask"]
@@ -951,7 +916,7 @@ def main(_):
   task_name = FLAGS.task_name.lower()
 
   if task_name not in processors:
-    raise ValueError("Task not found: %s" % (task_name))
+    raise ValueError(f"Task not found: {task_name}")
 
   processor = processors[task_name]()
 
@@ -1039,7 +1004,7 @@ def main(_):
       # the last batch.
       eval_steps = int(len(eval_examples) / FLAGS.eval_batch_size)
 
-    eval_drop_remainder = True if FLAGS.use_tpu else False
+    eval_drop_remainder = bool(FLAGS.use_tpu)
     eval_input_fn = file_based_input_fn_builder(
         input_file=eval_file,
         seq_length=FLAGS.max_seq_length,
@@ -1071,7 +1036,7 @@ def main(_):
       # experimental feature and hence not supported here
       raise ValueError("Prediction in TPU not supported")
 
-    predict_drop_remainder = True if FLAGS.use_tpu else False
+    predict_drop_remainder = bool(FLAGS.use_tpu)
     predict_input_fn = file_based_input_fn_builder(
         input_file=predict_file,
         seq_length=FLAGS.max_seq_length,

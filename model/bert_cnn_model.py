@@ -176,8 +176,7 @@ class BertCNNModel:
         print("#loss_lm.losses:",losses)
         lm_loss = tf.reduce_mean(losses)
         self.l2_loss_lm = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
-        loss=lm_loss+self.l2_loss_lm
-        return loss
+        return lm_loss+self.l2_loss_lm
 
     def loss(self,l2_lambda=0.0001*3):
         # input: `logits` and `labels` must have the same shape `[batch_size, num_classes]`
@@ -187,10 +186,9 @@ class BertCNNModel:
         self.losses = tf.reduce_mean((tf.reduce_sum(losses,axis=1)))  # shape=(?,)-->(). loss for all data in the batch-->single loss
         self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
 
-        loss=self.losses+self.l2_loss
-        return loss
+        return self.losses+self.l2_loss
 
-    def conv_layers_return_2layers(self, input_x, name_scope, reuse_flag=False):  # great 81.3
+    def conv_layers_return_2layers(self, input_x, name_scope, reuse_flag=False):    # great 81.3
         """main computation graph here: 1.embedding-->2.CONV-RELU-MAX_POOLING-->3.linear classifier"""
         # 1.=====>get emebedding of words in the sentence
         sentence_embeddings_expanded = tf.expand_dims(input_x,
@@ -200,24 +198,31 @@ class BertCNNModel:
         # you can use:tf.nn.conv2d;tf.nn.relu;tf.nn.max_pool; feature shape is 4-d. feature is a new variable
         pooled_outputs = []
         for i, filter_size in enumerate(self.filter_sizes):
-            with tf.variable_scope(str(name_scope) + "convolution-pooling-%s" % filter_size, reuse=reuse_flag):
+            with tf.variable_scope(f"{str(name_scope)}convolution-pooling-{filter_size}", reuse=reuse_flag):
                 # 1) CNN->BN->relu
-                filter = tf.get_variable("filter-%s" % filter_size, [filter_size, self.embed_size, 1, self.num_filters],
-                                         initializer=self.initializer)
+                filter = tf.get_variable(
+                    f"filter-{filter_size}",
+                    [filter_size, self.embed_size, 1, self.num_filters],
+                    initializer=self.initializer,
+                )
                 conv = tf.nn.conv2d(sentence_embeddings_expanded, filter, strides=[1, self.stride_length, 1, 1],padding="VALID",name="conv")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]
                 conv = tf.contrib.layers.batch_norm(conv, is_training=self.is_training_flag, scope='cnn1')
                 print(i, "conv1:", conv)
-                b = tf.get_variable("b-%s" % filter_size, [self.num_filters])  # ADD 2017-06-09
+                b = tf.get_variable(f"b-{filter_size}", [self.num_filters])
                 h = tf.nn.relu(tf.nn.bias_add(conv, b),"relu")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
 
                 # 2) CNN->BN->relu
                 h = tf.reshape(h, [-1, self.total_sequence_length - filter_size + 1, self.num_filters,1])  # shape:[batch_size,sequence_length-filter_size+1,num_filters,1]
                 # Layer2:CONV-RELU
-                filter2 = tf.get_variable("filter2-%s" % filter_size,[filter_size, self.num_filters, 1, self.num_filters],initializer=self.initializer)
+                filter2 = tf.get_variable(
+                    f"filter2-{filter_size}",
+                    [filter_size, self.num_filters, 1, self.num_filters],
+                    initializer=self.initializer,
+                )
                 conv2 = tf.nn.conv2d(h, filter2, strides=[1, 1, 1, 1], padding="VALID",name="conv2")  # shape:[batch_size,sequence_length-filter_size*2+2,1,num_filters]
                 conv2 = tf.contrib.layers.batch_norm(conv2, is_training=self.is_training_flag, scope='cnn2')
                 print(i, "conv2:", conv2)
-                b2 = tf.get_variable("b2-%s" % filter_size, [self.num_filters])  # ADD 2017-06-09
+                b2 = tf.get_variable(f"b2-{filter_size}", [self.num_filters])
                 h = tf.nn.relu(tf.nn.bias_add(conv2, b2),"relu2")  # shape:[batch_size,sequence_length - filter_size + 1,1,num_filters]. tf.nn.bias_add:adds `bias` to `value`
 
                 # 3. Max-pooling
@@ -239,8 +244,13 @@ class BertCNNModel:
     def train_lm_old(self):
         """based on the loss, use SGD to update parameter"""
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,self.decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val_lm, global_step=self.global_step,learning_rate=learning_rate, optimizer="Adam",clip_gradients=self.clip_gradients)
-        return train_op
+        return tf.contrib.layers.optimize_loss(
+            self.loss_val_lm,
+            global_step=self.global_step,
+            learning_rate=learning_rate,
+            optimizer="Adam",
+            clip_gradients=self.clip_gradients,
+        )
 
     def train_lm(self):
         """based on the loss, use SGD to update parameter"""
@@ -260,8 +270,13 @@ class BertCNNModel:
     def train_old(self):
         """based on the loss, use SGD to update parameter"""
         learning_rate = tf.train.exponential_decay(self.learning_rate, self.global_step, self.decay_steps,self.decay_rate, staircase=True)
-        train_op = tf.contrib.layers.optimize_loss(self.loss_val, global_step=self.global_step,learning_rate=learning_rate, optimizer="Adam",clip_gradients=self.clip_gradients)
-        return train_op
+        return tf.contrib.layers.optimize_loss(
+            self.loss_val,
+            global_step=self.global_step,
+            learning_rate=learning_rate,
+            optimizer="Adam",
+            clip_gradients=self.clip_gradients,
+        )
 
     def train(self):
         """based on the loss, use SGD to update parameter"""
@@ -299,7 +314,7 @@ def train():
     gpu_config = tf.ConfigProto()
     gpu_config.gpu_options.allow_growth = True
     saver = tf.train.Saver()
-    save_path = config.ckpt_dir + "model.ckpt"
+    save_path = f"{config.ckpt_dir}model.ckpt"
     #if not os.path.exists(config.ckpt_dir):
     #    os.makedirs(config.ckpt_dir)
     batch_size = 8
@@ -313,7 +328,7 @@ def train():
             input_x[input_x >= 0] = 1
             input_x[input_x < 0] = 0
             input_y = generate_label(input_x,threshold)
-            p_mask_lm=[i for i in range(batch_size)]
+            p_mask_lm = list(range(batch_size))
             # 3.run session to train the model, print some logs.
             loss, _ = sess.run([model.loss_val,  model.train_op],feed_dict={model.x_mask_lm: input_x, model.y_mask_lm: input_y,model.p_mask_lm:p_mask_lm,
                                                                             model.dropout_keep_prob: config.dropout_keep_prob})
@@ -337,7 +352,7 @@ def predict():
     with tf.Session(config=gpu_config) as sess:
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, tf.train.latest_checkpoint(ckpt_dir))
-        for i in range(100):
+        for _ in range(100):
             # 2.feed data
             input_x = np.random.randn(config.batch_size, config.sequence_length)  # [None, self.sequence_length]
             input_x[input_x >= 0] = 1
@@ -363,10 +378,7 @@ def generate_label(input_x,threshold):
         sum=np.sum(input_single)
         if i == 0:print("sum:",sum,";threshold:",threshold)
         y_single=1 if sum>threshold else 0
-        if y_single==1:
-            y[i]=[0,1]
-        else: # y_single=0
-            y[i]=[1,0]
+        y[i] = [0,1] if y_single==1 else [1,0]
     return y
 
 #train()

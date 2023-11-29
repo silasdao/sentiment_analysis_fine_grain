@@ -43,19 +43,23 @@ class Attention(Layer):
     def build(self, input_shape):
         assert len(input_shape) == 3
 
-        self.W = self.add_weight((input_shape[-1],),
-                                 initializer=self.init,
-                                 name='{}_W'.format(self.name),
-                                 regularizer=self.W_regularizer,
-                                 constraint=self.W_constraint)
+        self.W = self.add_weight(
+            (input_shape[-1],),
+            initializer=self.init,
+            name=f'{self.name}_W',
+            regularizer=self.W_regularizer,
+            constraint=self.W_constraint,
+        )
         self.features_dim = input_shape[-1]
 
         if self.bias:
-            self.b = self.add_weight((input_shape[1],),
-                                     initializer='zero',
-                                     name='{}_b'.format(self.name),
-                                     regularizer=self.b_regularizer,
-                                     constraint=self.b_constraint)
+            self.b = self.add_weight(
+                (input_shape[1],),
+                initializer='zero',
+                name=f'{self.name}_b',
+                regularizer=self.b_regularizer,
+                constraint=self.b_constraint,
+            )
         else:
             self.b = None
 
@@ -150,38 +154,50 @@ class JoinAttention(_Merge):
                              'on a list of 2 inputs with first ndim 2 and second one ndim 3. '
                              'Got ' + str(len(input_shape)) + ' inputs.')
 
-        self.W_en1 = self.add_weight((input_shape[0][-1], self.hid_size),
-                                 initializer=self.init,
-                                 name='{}_W0'.format(self.name),
-                                 regularizer=self.W_regularizer,
-                                 constraint=self.W_constraint)
-        self.W_en2 = self.add_weight((input_shape[1][-1], self.hid_size),
-                                 initializer=self.init,
-                                 name='{}_W1'.format(self.name),
-                                 regularizer=self.W_regularizer,
-                                 constraint=self.W_constraint)
-        self.W_de = self.add_weight((self.hid_size,),
-                                 initializer=self.init,
-                                 name='{}_W2'.format(self.name),
-                                 regularizer=self.W_regularizer,
-                                 constraint=self.W_constraint)
+        self.W_en1 = self.add_weight(
+            (input_shape[0][-1], self.hid_size),
+            initializer=self.init,
+            name=f'{self.name}_W0',
+            regularizer=self.W_regularizer,
+            constraint=self.W_constraint,
+        )
+        self.W_en2 = self.add_weight(
+            (input_shape[1][-1], self.hid_size),
+            initializer=self.init,
+            name=f'{self.name}_W1',
+            regularizer=self.W_regularizer,
+            constraint=self.W_constraint,
+        )
+        self.W_de = self.add_weight(
+            (self.hid_size,),
+            initializer=self.init,
+            name=f'{self.name}_W2',
+            regularizer=self.W_regularizer,
+            constraint=self.W_constraint,
+        )
 
         if self.bias:
-            self.b_en1 = self.add_weight((self.hid_size,),
-                                     initializer='zero',
-                                     name='{}_b0'.format(self.name),
-                                     regularizer=self.b_regularizer,
-                                     constraint=self.b_constraint)
-            self.b_en2 = self.add_weight((self.hid_size,),
-                                     initializer='zero',
-                                     name='{}_b1'.format(self.name),
-                                     regularizer=self.b_regularizer,
-                                     constraint=self.b_constraint)
-            self.b_de = self.add_weight((input_shape[1][1],),
-                                     initializer='zero',
-                                     name='{}_b2'.format(self.name),
-                                     regularizer=self.b_regularizer,
-                                     constraint=self.b_constraint)
+            self.b_en1 = self.add_weight(
+                (self.hid_size,),
+                initializer='zero',
+                name=f'{self.name}_b0',
+                regularizer=self.b_regularizer,
+                constraint=self.b_constraint,
+            )
+            self.b_en2 = self.add_weight(
+                (self.hid_size,),
+                initializer='zero',
+                name=f'{self.name}_b1',
+                regularizer=self.b_regularizer,
+                constraint=self.b_constraint,
+            )
+            self.b_de = self.add_weight(
+                (input_shape[1][1],),
+                initializer='zero',
+                name=f'{self.name}_b2',
+                regularizer=self.b_regularizer,
+                constraint=self.b_constraint,
+            )
         else:
             self.b_en1 = None
             self.b_en2 = None
